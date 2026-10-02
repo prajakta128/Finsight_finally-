@@ -21,9 +21,15 @@ export const businesses = pgTable(
     financialYear: text("financial_year").notNull(),
     openingCash: numeric("opening_cash", { precision: 14, scale: 2 }).notNull(),
     monthlyRevenueTarget: numeric("monthly_revenue_target", { precision: 14, scale: 2 }).notNull(),
+    // E.164 phone number (e.g. "+919876543210") linked to this business for
+    // WhatsApp quick-entry. Nullable: most businesses won't set this up.
+    whatsappPhone: text("whatsapp_phone"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => ({ userIdIdx: uniqueIndex("businesses_user_id_idx").on(table.userId) }),
+  (table) => ({
+    userIdIdx: uniqueIndex("businesses_user_id_idx").on(table.userId),
+    whatsappPhoneIdx: uniqueIndex("businesses_whatsapp_phone_idx").on(table.whatsappPhone),
+  }),
 );
 
 export const transactions = pgTable("transactions", {
@@ -37,6 +43,7 @@ export const transactions = pgTable("transactions", {
   customer: text("customer"),
   date: date("date").notNull(),
   status: text("status").notNull(),
+  source: text("source").notNull().default("app"),
 });
 
 export const customers = pgTable("customers", {

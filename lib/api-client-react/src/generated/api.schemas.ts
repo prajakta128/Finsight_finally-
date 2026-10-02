@@ -18,6 +18,7 @@ export interface Business {
   financialYear: string;
   openingCash: number;
   monthlyRevenueTarget: number;
+  whatsappPhone?: string | null;
   createdAt: string;
 }
 
@@ -59,6 +60,7 @@ export interface Transaction {
   customer?: string | null;
   date: string;
   status: string;
+  source?: string;
 }
 
 export interface TransactionInput {
@@ -257,4 +259,3 @@ export const ListTransactionsType = {
   expense: 'expense',
   revenue: 'revenue',
 } as const;
-
