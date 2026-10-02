@@ -68,6 +68,8 @@ import {
   RefreshCw,
   Search,
   Settings,
+  Moon,
+  Sun,
   ShieldCheck,
   Sparkles,
   Target,
@@ -79,6 +81,8 @@ import {
 } from "lucide-react";
 import { LanguageProvider, useLanguage } from "./lib/LanguageContext";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
+import { CountUp, PageTransition, Stagger, StaggerItem } from "@/components/motion";
+import { motion } from "framer-motion";
 import { FIELD_HELP, FORM_HELP, speak, speechSupported, type Lang } from "./lib/i18n";
 import {
   Area,
@@ -148,54 +152,116 @@ function stripBase(path: string) {
     : path;
 }
 
-const clerkAppearance = {
-  theme: shadcn,
-  cssLayerName: "clerk",
-  options: {
-    logoPlacement: "inside" as const,
-    logoLinkUrl: basePath || "/",
-    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
-  },
-  variables: {
-    colorPrimary: "#317f6c",
-    colorForeground: "#203943",
-    colorMutedForeground: "#6f7c7b",
-    colorDanger: "#a3463d",
-    colorBackground: "#fffdf8",
-    colorInput: "#fffdf8",
-    colorInputForeground: "#203943",
-    colorNeutral: "#d9ded8",
-    fontFamily: "DM Sans, sans-serif",
-    borderRadius: "0.8rem",
-  },
-  elements: {
-    rootBox: "w-full flex justify-center",
-    cardBox: "bg-[#fffdf8] rounded-2xl w-[440px] max-w-full overflow-hidden",
-    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
-    headerTitle: "text-[#203943]",
-    headerSubtitle: "text-[#6f7c7b]",
-    socialButtonsBlockButtonText: "text-[#203943]",
-    formFieldLabel: "text-[#203943]",
-    footerActionLink: "text-[#28715e]",
-    footerActionText: "text-[#6f7c7b]",
-    dividerText: "text-[#6f7c7b]",
-    identityPreviewEditButton: "text-[#28715e]",
-    formFieldSuccessText: "text-[#28715e]",
-    alertText: "text-[#a3463d]",
-    logoBox: "h-12",
-    logoImage: "h-10 w-10",
-    socialButtonsBlockButton: "border-[#d9ded8] bg-[#fffdf8]",
-    formButtonPrimary: "bg-[#317f6c] text-white",
-    formFieldInput: "border-[#d9ded8] bg-[#fffdf8] text-[#203943]",
-    footerAction: "bg-transparent",
-    dividerLine: "bg-[#d9ded8]",
-    alert: "border-[#f0d7bd] bg-[#fff8ed]",
-    otpCodeFieldInput: "border-[#d9ded8] bg-[#fffdf8] text-[#203943]",
-    formFieldRow: "text-[#203943]",
-    main: "bg-transparent",
-  },
-};
+function speakWithFeedback(text: string, lang: Lang) {
+  const result = speak(text, lang);
+  if (result === "no-voice") {
+    toast.error(
+      "No voice for this language is installed on this device. Try Microsoft Edge, or install the language voice in your system settings.",
+    );
+  } else if (result === "fallback") {
+    toast.info("Marathi voice not found, reading with the Hindi voice.");
+  }
+}
+
+type ThemeMode = "dark" | "light";
+const THEME_STORAGE_KEY = "finsight_theme";
+
+const ThemeContext = createContext<{ theme: ThemeMode; toggleTheme: () => void }>({
+  theme: "light",
+  toggleTheme: () => undefined,
+});
+
+function getInitialTheme(): ThemeMode {
+  return window.localStorage.getItem(THEME_STORAGE_KEY) === "dark" ? "dark" : "light";
+}
+
+function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("light", theme === "light");
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.style.colorScheme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
+
+  const value = useMemo(
+    () => ({
+      theme,
+      toggleTheme: () => setTheme((c) => (c === "dark" ? "light" : "dark")),
+    }),
+    [theme],
+  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+function useThemeMode() {
+  return useContext(ThemeContext);
+}
+
+function getClerkAppearance(theme: ThemeMode) {
+  const dark = theme === "dark";
+  const c = {
+    fg: dark ? "#e8eef0" : "#203943",
+    muted: dark ? "#9fb0b4" : "#6f7c7b",
+    surface: dark ? "#1f2a33" : "#fffdf8",
+    line: dark ? "#35454f" : "#d9ded8",
+    link: dark ? "#5cc9a0" : "#28715e",
+    danger: dark ? "#ef8a7a" : "#a3463d",
+    primary: dark ? "#4bb895" : "#317f6c",
+  };
+  return {
+    theme: shadcn,
+    cssLayerName: "clerk",
+    options: {
+      logoPlacement: "inside" as const,
+      logoLinkUrl: basePath || "/",
+      logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+    },
+    variables: {
+      colorPrimary: c.primary,
+      colorForeground: c.fg,
+      colorMutedForeground: c.muted,
+      colorDanger: c.danger,
+      colorBackground: c.surface,
+      colorInput: c.surface,
+      colorInputForeground: c.fg,
+      colorNeutral: c.line,
+      fontFamily: "DM Sans, sans-serif",
+      borderRadius: "0.8rem",
+    },
+    elements: {
+      rootBox: "w-full flex justify-center",
+      cardBox: dark
+        ? "bg-[#1f2a33] rounded-2xl w-[440px] max-w-full overflow-hidden border border-white/10"
+        : "bg-card rounded-2xl w-[440px] max-w-full overflow-hidden",
+      card: "!shadow-none !border-0 !bg-transparent !rounded-none",
+      footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
+      headerTitle: { color: c.fg },
+      headerSubtitle: { color: c.muted },
+      socialButtonsBlockButtonText: { color: c.fg },
+      formFieldLabel: { color: c.fg },
+      footerActionLink: { color: c.link },
+      footerActionText: { color: c.muted },
+      dividerText: { color: c.muted },
+      identityPreviewEditButton: { color: c.link },
+      formFieldSuccessText: { color: c.link },
+      alertText: { color: c.danger },
+      logoBox: "h-12",
+      logoImage: "h-10 w-10",
+      socialButtonsBlockButton: { borderColor: c.line, backgroundColor: c.surface },
+      formButtonPrimary: { backgroundColor: c.primary, color: "#fff" },
+      formFieldInput: { borderColor: c.line, backgroundColor: c.surface, color: c.fg },
+      footerAction: "bg-transparent",
+      dividerLine: { backgroundColor: c.line },
+      alert: dark ? "border-[#ef8a7a]/40 bg-[#ef8a7a]/10" : "border-warning/30 bg-warning/10",
+      otpCodeFieldInput: { borderColor: c.line, backgroundColor: c.surface, color: c.fg },
+      formFieldRow: { color: c.fg },
+      main: "bg-transparent",
+    },
+  };
+}
+
 
 type IconType = typeof LayoutDashboard;
 type NavItem = { href: string; label: string; icon: IconType };
@@ -256,10 +322,10 @@ function Pill({
 }) {
   const styles = {
     neutral: "bg-muted text-muted-foreground",
-    green: "bg-[#e0f0e8] text-[#28715e]",
-    amber: "bg-[#fbecd4] text-[#9a641e]",
-    red: "bg-[#f7dfda] text-[#a3463d]",
-    blue: "bg-[#deedf1] text-[#397285]",
+    green: "bg-positive/15 text-positive",
+    amber: "bg-warning/15 text-warning",
+    red: "bg-negative/15 text-negative",
+    blue: "bg-info/15 text-info",
   };
   return (
     <span
@@ -278,7 +344,7 @@ function Card({
 }) {
   return (
     <section
-      className={`rounded-2xl border border-card-border bg-card shadow-[0_1px_2px_rgba(23,52,59,.04),0_16px_32px_-12px_rgba(23,52,59,.14)] ${className}`}
+      className={`card-lift rounded-2xl border border-card-border bg-card shadow-[0_1px_2px_rgba(23,52,59,.04),0_16px_32px_-12px_rgba(23,52,59,.14)] ${className}`}
     >
       {children}
     </section>
@@ -324,7 +390,7 @@ function EmptyButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all hover:-translate-y-0.5 ${variant === "primary" ? "bg-primary text-primary-foreground shadow-sm hover:shadow-md" : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-muted"}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all hover:-translate-y-0.5 ${variant === "primary" ? "btn-press bg-primary text-primary-foreground shadow-sm hover:shadow-md" : "border border-border bg-card text-foreground hover:border-primary/40 hover:bg-muted"}`}
     >
       <span>{children}</span>
       <Icon size={14} />
@@ -350,7 +416,7 @@ function Field({
             type="button"
             onClick={(e) => {
               e.preventDefault();
-              speak(FIELD_HELP[helpKey][lang], lang);
+              speakWithFeedback(FIELD_HELP[helpKey][lang], lang);
             }}
             aria-label={`Listen to help for ${label}`}
             className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -375,7 +441,7 @@ function Modal({
   onListen?: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#17343b]/40 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-rise">
         <div className="mb-5 flex items-center justify-between">
           <span className="inline-flex items-center gap-2">
@@ -438,28 +504,47 @@ function Metric({
   delta,
   icon: Icon,
   tone = "green",
+  animatedValue,
 }: {
   label: string;
   value: string;
   delta?: string;
+  animatedValue?: number;
   icon: IconType;
   tone?: "green" | "amber" | "blue" | "red";
 }) {
+  const compactMatch = value.match(/^₹([\d,.]+)([LK])?$/);
+  const countMatch = value.match(/^[\d,]+$/);
+  const parsedValue = compactMatch
+    ? Number(compactMatch[1].replace(/,/g, "")) *
+      (compactMatch[2] === "L" ? 100000 : compactMatch[2] === "K" ? 1000 : 1)
+    : countMatch
+      ? Number(value.replace(/,/g, ""))
+      : undefined;
+  const shouldAnimate = animatedValue !== undefined || parsedValue !== undefined;
+  const countValue = animatedValue ?? parsedValue ?? 0;
   const bg = {
-    green: "bg-[#e1f0e9] text-[#28715e]",
-    amber: "bg-[#fbecd4] text-[#9a641e]",
-    blue: "bg-[#deedf1] text-[#397285]",
-    red: "bg-[#f7dfda] text-[#a3463d]",
+    green: "bg-positive/15 text-positive",
+    amber: "bg-warning/15 text-warning",
+    blue: "bg-info/15 text-info",
+    red: "bg-negative/15 text-negative",
   };
   return (
-    <Card className="relative overflow-hidden p-5 transition-transform hover:-translate-y-0.5">
+    <Card className="relative overflow-hidden p-5">
       <div className="flex items-start justify-between">
         <div>
           <div className="text-[11px] font-semibold text-muted-foreground">
             {label}
           </div>
           <div className="mt-2 font-display text-[25px] font-semibold tracking-tight">
-            {value}
+            {!shouldAnimate ? (
+              value
+            ) : (
+              <CountUp
+                value={countValue}
+                format={animatedValue !== undefined || compactMatch ? compact : undefined}
+              />
+            )}
           </div>
         </div>
         <span
@@ -469,7 +554,7 @@ function Metric({
         </span>
       </div>
       {delta && (
-        <div className="mt-3 flex items-center gap-1 text-[11px] text-[#28715e]">
+        <div className="mt-3 flex items-center gap-1 text-[11px] text-positive">
           <ArrowUpRight size={13} />
           {delta}
           <span className="text-muted-foreground">vs previous period</span>
@@ -516,7 +601,7 @@ function useBusinessData() {
 /** Small green tag shown next to entries that were sent by WhatsApp. */
 function WhatsappBadge() {
   return (
-    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#e3f6ec] px-2 py-0.5 text-[10px] font-semibold text-[#1f8f5a]">
+    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-positive/15 px-2 py-0.5 text-[10px] font-semibold text-positive">
       <MessageCircle size={10} />
       WhatsApp
     </span>
@@ -655,8 +740,8 @@ function LandingPage() {
           </div>
         </div>
         <div className="relative">
-          <div className="absolute -inset-6 rounded-[2rem] bg-[#dfeee7]/70 blur-3xl" />
-          <Card className="relative overflow-hidden border-[#d4e5dc] bg-[#fffdf8] p-5 shadow-2xl shadow-primary/10">
+          <div className="absolute -inset-6 rounded-[2rem] bg-primary/15 blur-3xl" />
+          <Card className="relative overflow-hidden border-border bg-card p-5 shadow-2xl shadow-primary/10">
             <div className="flex items-center justify-between border-b border-border pb-4">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">
@@ -666,7 +751,7 @@ function LandingPage() {
                   Your business, understood
                 </div>
               </div>
-              <span className="grid size-9 place-items-center rounded-xl bg-[#e0f0e8] text-primary">
+              <span className="grid size-9 place-items-center rounded-xl bg-positive/15 text-primary">
                 <Activity size={17} />
               </span>
             </div>
@@ -682,7 +767,7 @@ function LandingPage() {
                   ↑ 8.2% this month
                 </div>
               </div>
-              <div className="rounded-xl bg-[#edf5f1] p-4">
+              <div className="rounded-xl bg-muted p-4">
                 <div className="text-[10px] text-muted-foreground">
                   Health score
                 </div>
@@ -712,7 +797,7 @@ function LandingPage() {
                 ))}
               </div>
             </div>
-            <div className="mt-4 flex items-start gap-3 rounded-xl bg-[#fff8ed] p-3">
+            <div className="mt-4 flex items-start gap-3 rounded-xl bg-warning/10 p-3">
               <AlertCircle size={16} className="mt-0.5 text-accent" />
               <div>
                 <div className="text-xs font-semibold">Signal detected</div>
@@ -796,10 +881,10 @@ function SetupPage() {
               Start with the basics. Your dashboard will stay clear and empty
               until you add your first records.
             </p>
-            <div className="mt-8 rounded-2xl border border-[#d4e5dc] bg-[#f2faf6] p-4 text-xs leading-5 text-[#28715e]">
+            <div className="mt-8 rounded-2xl border border-border bg-positive/10 p-4 text-xs leading-5 text-positive">
               <Lightbulb size={16} className="mb-2" />
               <b>You can load the demo instead</b>
-              <p className="mt-1 text-[#5e8073]">
+              <p className="mt-1 text-muted-foreground">
                 Use Shree Packaging Solutions to walk through the competition
                 flow. It only appears when you choose it.
               </p>
@@ -907,6 +992,7 @@ function Shell({ children }: { children: ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
   const { user } = useUser();
   const { signOut } = useClerk();
+  const { theme, toggleTheme } = useThemeMode();
   const data = useBusinessData();
   const currentLabel =
     navGroups.flatMap((g) => g.items).find((i) => i.href === location)?.label ??
@@ -942,7 +1028,7 @@ function Shell({ children }: { children: ReactNode }) {
         </div>
         <div className="mb-4 rounded-xl border border-sidebar-border bg-sidebar-accent/60 p-3">
           <div className="flex items-center gap-2.5">
-            <span className="grid size-8 place-items-center rounded-lg bg-[#d5a35e] text-xs font-bold text-[#203943]">
+            <span className="grid size-8 place-items-center rounded-lg bg-warning/20 text-xs font-bold text-warning">
               {data.business.name.slice(0, 2).toUpperCase()}
             </span>
             <div className="min-w-0">
@@ -974,12 +1060,12 @@ function Shell({ children }: { children: ReactNode }) {
                       key={item.href}
                       href={item.href}
                       onClick={() => setMobileNav(false)}
-                      className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[12px] font-medium transition-colors ${active ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}
+                      className={`nav-link group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[12px] font-medium transition-colors ${active ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"}`}
                     >
                       <Icon size={16} strokeWidth={active ? 2.4 : 1.8} />
                       <span>{item.label}</span>
                       {item.href === "/alerts" && (
-                        <span className="ml-auto grid size-5 place-items-center rounded-full bg-[#d87855] text-[9px] font-bold text-white">
+                        <span className="ml-auto grid size-5 place-items-center rounded-full bg-negative text-[9px] font-bold text-white">
                           {calculateFinancials(data).populated ? 1 : 0}
                         </span>
                       )}
@@ -1009,7 +1095,7 @@ function Shell({ children }: { children: ReactNode }) {
       {mobileNav && (
         <button
           type="button"
-          className="fixed inset-0 z-30 bg-[#18323a]/40 md:hidden"
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
           onClick={() => setMobileNav(false)}
           aria-label="Close menu overlay"
         />
@@ -1035,6 +1121,15 @@ function Shell({ children }: { children: ReactNode }) {
             <div className="hidden lg:block">
               <LanguageSwitcher />
             </div>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+              title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+              className="grid size-9 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
             <div className="relative hidden w-[250px] md:block">
               <Search
                 size={15}
@@ -1049,7 +1144,7 @@ function Shell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <div className="mx-auto max-w-[1500px] px-4 py-7 sm:px-7 lg:px-9">
-          {children}
+          <PageTransition key={location}>{children}</PageTransition>
         </div>
       </main>
     </div>
@@ -1070,7 +1165,7 @@ function EmptyState({
   return (
     <div className="grid min-h-[230px] place-items-center rounded-2xl border border-dashed border-border bg-muted/20 p-8 text-center">
       <div>
-        <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#e0f0e8] text-primary">
+        <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-positive/15 text-primary">
           <Lightbulb size={20} />
         </div>
         <h3 className="mt-4 font-display text-lg font-semibold">{title}</h3>
@@ -1156,41 +1251,56 @@ function Dashboard() {
           </div>
         }
       </div>
-      <div className="mb-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Metric
+      <Stagger className="mb-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StaggerItem>
+          <Metric
           label="Revenue"
+            animatedValue={f.revenue}
           value={compact(f.revenue)}
           delta={f.populated ? "Live" : undefined}
           icon={TrendingUp}
         />
-        <Metric
+        </StaggerItem>
+        <StaggerItem>
+          <Metric
           label="Expenses"
+            animatedValue={f.expenseTotal}
           value={compact(f.expenseTotal)}
           delta={f.populated ? "Live" : undefined}
           icon={TrendingDown}
           tone="amber"
         />
-        <Metric
+        </StaggerItem>
+        <StaggerItem>
+          <Metric
           label="Net cash flow"
+            animatedValue={f.netCashFlow}
           value={compact(f.netCashFlow)}
           delta={f.populated ? "Calculated" : undefined}
           icon={Activity}
         />
-        <Metric
+        </StaggerItem>
+        <StaggerItem>
+          <Metric
           label="Current cash"
+            animatedValue={f.currentCash}
           value={compact(f.currentCash)}
           delta={f.populated ? "Opening + net" : undefined}
           icon={CircleDollarSign}
           tone="blue"
         />
-        <Metric
+        </StaggerItem>
+        <StaggerItem>
+          <Metric
           label="Receivables"
+            animatedValue={f.receivables}
           value={compact(f.receivables)}
           delta={f.populated ? "Live" : undefined}
           icon={WalletCards}
           tone="amber"
         />
-      </div>
+        </StaggerItem>
+      </Stagger>
       <div className="mb-6 grid gap-6 xl:grid-cols-[1.55fr_1fr]">
         <Card className="p-5 sm:p-6">
           <SectionTitle
@@ -1211,26 +1321,26 @@ function Dashboard() {
             <div className="h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={f.monthly}>
-                  <CartesianGrid vertical={false} stroke="#e7e1d5" />
+                  <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
                   <XAxis
                     dataKey="month"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: "#8a928f" }}
+                    tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
                   />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
                     tickFormatter={(v) => `₹${Number(v) / 100000}L`}
-                    tick={{ fontSize: 10, fill: "#8a928f" }}
+                    tick={{ fontSize: 10, fill: "var(--chart-axis)" }}
                   />
                   <ReTooltip content={<ChartTip />} />
                   <Area
                     type="monotone"
                     dataKey="revenue"
                     name="Revenue"
-                    stroke="#317f6c"
-                    fill="#317f6c"
+                    stroke="var(--chart-primary)"
+                    fill="var(--chart-primary)"
                     fillOpacity=".12"
                     strokeWidth={2.5}
                   />
@@ -1238,8 +1348,8 @@ function Dashboard() {
                     type="monotone"
                     dataKey="expenses"
                     name="Expenses"
-                    stroke="#de9b42"
-                    fill="#de9b42"
+                    stroke="var(--chart-amber)"
+                    fill="var(--chart-amber)"
                     fillOpacity=".1"
                     strokeWidth={2}
                   />
@@ -1267,7 +1377,7 @@ function Dashboard() {
                 <div
                   className="relative grid size-32 shrink-0 place-items-center rounded-full"
                   style={{
-                    background: `conic-gradient(#317f6c 0 ${f.score}%, #e7e1d5 ${f.score}% 100%)`,
+                    background: `conic-gradient(var(--chart-primary) 0 ${f.score}%, var(--chart-grid) ${f.score}% 100%)`,
                   }}
                 >
                   <div className="grid size-24 place-items-center rounded-full bg-card">
@@ -1393,25 +1503,25 @@ function Dashboard() {
               <div className="h-[205px]">
                 <ResponsiveContainer>
                   <LineChart data={f.forecast}>
-                    <CartesianGrid vertical={false} stroke="#e7e1d5" />
+                    <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
                     <XAxis
                       dataKey="label"
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fontSize: 11, fill: "#8a928f" }}
+                      tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
                     />
                     <YAxis hide />
                     <ReTooltip content={<ChartTip />} />
                     <Line
                       dataKey="balance"
                       name="Cash balance"
-                      stroke="#397285"
+                      stroke="var(--chart-blue)"
                       strokeWidth={3}
                       dot={{
-                        fill: "#397285",
+                        fill: "var(--chart-blue)",
                         r: 4,
                         strokeWidth: 2,
-                        stroke: "#f9f7f1",
+                        stroke: "var(--chart-tooltip-bg)",
                       }}
                     />
                   </LineChart>
@@ -1421,7 +1531,7 @@ function Dashboard() {
                 <span className="text-muted-foreground">
                   Expected closing balance
                 </span>
-                <b className="text-[#28715e]">
+                <b className="text-positive">
                   {compact(f.forecast[2].balance)}
                 </b>
               </div>
@@ -1456,7 +1566,7 @@ function Dashboard() {
                 key={c.id}
                 className="flex items-center gap-3 border-b border-border py-3 last:border-0"
               >
-                <span className="grid size-8 place-items-center rounded-lg bg-[#e5efeb] text-[10px] font-bold text-primary">
+                <span className="grid size-8 place-items-center rounded-lg bg-positive/15 text-[10px] font-bold text-primary">
                   {c.customer.slice(0, 2).toUpperCase()}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -1503,10 +1613,10 @@ function Dashboard() {
                 f.anomalies.slice(0, 2).map((anomaly) => (
                   <div
                     key={anomaly.category}
-                    className="rounded-xl border border-[#f0d7bd] bg-[#fff8ed] p-3"
+                    className="rounded-xl border border-warning/30 bg-warning/10 p-3"
                   >
                     <div className="flex items-start gap-3">
-                      <span className="grid size-8 place-items-center rounded-lg bg-[#fae5bd] text-[#9a641e]">
+                      <span className="grid size-8 place-items-center rounded-lg bg-warning/15 text-warning">
                         <AlertCircle size={16} />
                       </span>
                       <div>
@@ -1521,9 +1631,9 @@ function Dashboard() {
                   </div>
                 ))
               ) : (
-                <div className="rounded-xl border border-[#f0d7bd] bg-[#fff8ed] p-3">
+                <div className="rounded-xl border border-warning/30 bg-warning/10 p-3">
                   <div className="flex items-start gap-3">
-                    <span className="grid size-8 place-items-center rounded-lg bg-[#fae5bd] text-[#9a641e]">
+                    <span className="grid size-8 place-items-center rounded-lg bg-warning/15 text-warning">
                       <AlertCircle size={16} />
                     </span>
                     <div>
@@ -1539,9 +1649,9 @@ function Dashboard() {
                   </div>
                 </div>
               )}
-              <div className="rounded-xl border border-[#d3e7df] bg-[#f2faf6] p-3">
+              <div className="rounded-xl border border-positive/30 bg-positive/10 p-3">
                 <div className="flex items-start gap-3">
-                  <span className="grid size-8 place-items-center rounded-lg bg-[#dcefe5] text-primary">
+                  <span className="grid size-8 place-items-center rounded-lg bg-positive/15 text-primary">
                     <Lightbulb size={16} />
                   </span>
                   <div>
@@ -1758,7 +1868,7 @@ function RecordModal({
       onClose={onClose}
       onListen={
         speechSupported() && FORM_HELP[kind]
-          ? () => speak(FORM_HELP[kind][lang], lang)
+          ? () => speakWithFeedback(FORM_HELP[kind][lang], lang)
           : undefined
       }
     >
@@ -2169,7 +2279,7 @@ function TransactionsPage() {
                 {filtered.map((t) => (
                   <tr
                     key={t.id}
-                    className="border-t border-border text-xs transition hover:bg-muted/30"
+                    className="table-row border-t border-border text-xs"
                   >
                     <td className="px-5 py-4 text-muted-foreground">
                       {formatDate(t.date)}
@@ -2263,24 +2373,24 @@ function RevenuePage() {
           <div className="h-[300px]">
             <ResponsiveContainer>
               <BarChart data={f.monthly}>
-                <CartesianGrid vertical={false} stroke="#e7e1d5" />
+                <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
                 <XAxis
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 11, fill: "#8a928f" }}
+                  tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => `₹${Number(v) / 100000}L`}
-                  tick={{ fontSize: 10, fill: "#8a928f" }}
+                  tick={{ fontSize: 10, fill: "var(--chart-axis)" }}
                 />
                 <ReTooltip content={<ChartTip />} />
                 <Bar
                   dataKey="revenue"
                   name="Revenue"
-                  fill="#317f6c"
+                  fill="var(--chart-primary)"
                   radius={[5, 5, 0, 0]}
                 />
               </BarChart>
@@ -2313,7 +2423,7 @@ function RevenuePage() {
               </thead>
               <tbody>
                 {f.revenueEntries.map((t) => (
-                  <tr key={t.id} className="border-t border-border text-xs transition hover:bg-muted/30">
+                  <tr key={t.id} className="table-row border-t border-border text-xs">
                     <td className="px-5 py-4 font-semibold">
                       {t.description}
                       {t.source === "whatsapp" && <WhatsappBadge />}
@@ -2417,7 +2527,7 @@ function ReceivablesPage() {
               </thead>
               <tbody>
                 {data.receivables.map((c) => (
-                  <tr key={c.id} className="border-t border-border">
+                  <tr key={c.id} className="table-row border-t border-border">
                     <td className="px-5 py-4 font-semibold">{c.customer}</td>
                     <td className="px-5 py-4 text-muted-foreground">
                       {c.invoice}
@@ -2527,7 +2637,7 @@ function PayablesPage() {
               </thead>
               <tbody>
                 {data.payables.map((p) => (
-                  <tr key={p.id} className="border-t border-border">
+                  <tr key={p.id} className="table-row border-t border-border">
                     <td className="px-5 py-4 font-semibold">{p.vendor}</td>
                     <td className="px-5 py-4 text-muted-foreground">
                       {p.reference}
@@ -2634,9 +2744,9 @@ function VendorsPage() {
               </thead>
               <tbody>
                 {data.vendors.map((v) => (
-                  <tr key={v.id} className="border-t border-border">
+                  <tr key={v.id} className="table-row border-t border-border">
                     <td className="px-5 py-4 font-semibold">
-                      <span className="mr-2 inline-grid size-8 place-items-center rounded-lg bg-[#e9e4d7] text-[9px] font-bold text-[#6b6655]">
+                      <span className="mr-2 inline-grid size-8 place-items-center rounded-lg bg-muted text-[9px] font-bold text-muted-foreground">
                         {v.name.slice(0, 2).toUpperCase()}
                       </span>
                       {v.name}
@@ -2723,24 +2833,24 @@ function AnalyticsPage() {
               <div className="h-[280px]">
                 <ResponsiveContainer>
                   <LineChart data={f.monthly}>
-                    <CartesianGrid vertical={false} stroke="#e7e1d5" />
+                    <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
                     <XAxis
                       dataKey="month"
                       axisLine={false}
                       tickLine={false}
-                      tick={{ fontSize: 10, fill: "#8a928f" }}
+                      tick={{ fontSize: 10, fill: "var(--chart-axis)" }}
                     />
                     <YAxis
                       axisLine={false}
                       tickLine={false}
                       tickFormatter={(v) => `₹${Number(v) / 100000}L`}
-                      tick={{ fontSize: 10, fill: "#8a928f" }}
+                      tick={{ fontSize: 10, fill: "var(--chart-axis)" }}
                     />
                     <ReTooltip content={<ChartTip />} />
                     <Line
                       dataKey="expenses"
                       name="Total expenses"
-                      stroke="#de9b42"
+                      stroke="var(--chart-amber)"
                       strokeWidth={3}
                       dot={false}
                     />
@@ -2884,35 +2994,35 @@ function ForecastPage() {
                 <AreaChart data={f.forecast}>
                   <defs>
                     <linearGradient id="balFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0" stopColor="#397285" stopOpacity=".22" />
-                      <stop offset="1" stopColor="#397285" stopOpacity="0" />
+                      <stop offset="0" stopColor="var(--chart-blue)" stopOpacity=".22" />
+                      <stop offset="1" stopColor="var(--chart-blue)" stopOpacity="0" />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid vertical={false} stroke="#e7e1d5" />
+                  <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
                   <XAxis
                     dataKey="label"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: "#8a928f" }}
+                    tick={{ fontSize: 11, fill: "var(--chart-axis)" }}
                   />
                   <YAxis
                     axisLine={false}
                     tickLine={false}
                     tickFormatter={(v) => `₹${Number(v) / 100000}L`}
-                    tick={{ fontSize: 10, fill: "#8a928f" }}
+                    tick={{ fontSize: 10, fill: "var(--chart-axis)" }}
                   />
                   <ReTooltip content={<ChartTip />} />
                   <Area
                     dataKey="balance"
                     name="Closing cash"
-                    stroke="#397285"
+                    stroke="var(--chart-blue)"
                     fill="url(#balFill)"
                     strokeWidth={3}
                   />
                   <Line
                     dataKey="inflow"
                     name="Cash inflow"
-                    stroke="#317f6c"
+                    stroke="var(--chart-primary)"
                     strokeDasharray="4 4"
                     strokeWidth={2}
                   />
@@ -3023,13 +3133,18 @@ function AlertsPage() {
               const Icon = a.icon;
               const isDone = done.includes(a.id);
               return (
-                <Card
+                <motion.div
                   key={a.id}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                >
+                <Card
                   className={`p-5 transition ${isDone ? "opacity-60" : ""}`}
                 >
                   <div className="flex gap-4">
                     <span
-                      className={`grid size-10 shrink-0 place-items-center rounded-xl ${a.tone === "amber" ? "bg-[#fbecd4] text-[#9a641e]" : a.tone === "blue" ? "bg-[#deedf1] text-[#397285]" : a.tone === "red" ? "bg-[#f7ded9] text-[#a3463d]" : "bg-[#e0f0e8] text-[#28715e]"}`}
+                      className={`grid size-10 shrink-0 place-items-center rounded-xl ${a.tone === "amber" ? "bg-warning/15 text-warning" : a.tone === "blue" ? "bg-info/15 text-info" : a.tone === "red" ? "bg-negative/15 text-negative" : "bg-positive/15 text-positive"}`}
                     >
                       <Icon size={19} />
                     </span>
@@ -3051,6 +3166,7 @@ function AlertsPage() {
                     </div>
                   </div>
                 </Card>
+                </motion.div>
               );
             })
           ) : (
@@ -3087,7 +3203,7 @@ function AlertsPage() {
                 <div
                   className="mx-auto grid size-28 place-items-center rounded-full"
                   style={{
-                    background: `conic-gradient(#317f6c 0 ${coverage}%, #dcefe5 ${coverage}% 100%)`,
+                    background: `conic-gradient(var(--chart-primary) 0 ${coverage}%, var(--chart-grid) ${coverage}% 100%)`,
                   }}
                 >
                   <div className="grid size-[88px] place-items-center rounded-full bg-card">
@@ -3160,7 +3276,7 @@ function ChangesPage() {
                   className="flex flex-col gap-3 px-1 py-4 sm:flex-row sm:items-center"
                 >
                   <span
-                    className={`grid size-9 place-items-center rounded-xl ${change.direction === "up" ? "bg-[#e0f0e8] text-primary" : change.direction === "down" ? "bg-[#f7ded9] text-[#a3463d]" : "bg-[#eceae2] text-muted-foreground"}`}
+                    className={`grid size-9 place-items-center rounded-xl ${change.direction === "up" ? "bg-positive/15 text-primary" : change.direction === "down" ? "bg-negative/15 text-negative" : "bg-muted text-muted-foreground"}`}
                   >
                     {change.direction === "down" ? (
                       <ArrowDownRight size={17} />
@@ -3182,7 +3298,7 @@ function ChangesPage() {
                       change.direction === "up"
                         ? "text-primary"
                         : change.direction === "down"
-                          ? "text-[#a3463d]"
+                          ? "text-negative"
                           : ""
                     }
                   >
@@ -3295,7 +3411,7 @@ function SimulatorPage() {
                       className={
                         values[key as keyof typeof values] >= 0
                           ? "text-primary"
-                          : "text-[#a3463d]"
+                          : "text-negative"
                       }
                     >
                       {values[key as keyof typeof values] > 0 ? "+" : ""}
@@ -3310,7 +3426,7 @@ function SimulatorPage() {
                     onChange={(e) =>
                       update(key as keyof typeof values, e.target.value)
                     }
-                    className="w-full accent-[#317f6c]"
+                    className="w-full accent-primary"
                   />
                   <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
                     <span>-20%</span>
@@ -3359,7 +3475,7 @@ function SimulatorPage() {
                 eyebrow="Scenario summary"
                 title="The impact in plain English"
               />
-              <div className="rounded-xl border border-[#d3e7df] bg-[#f2faf6] p-4">
+              <div className="rounded-xl border border-positive/30 bg-positive/10 p-4">
                 <div className="flex items-start gap-3">
                   <Sparkles size={17} className="mt-0.5 text-primary" />
                   <p className="text-xs leading-5">
@@ -3494,7 +3610,7 @@ function InvoicePage() {
             </p>
           </div>
           <label
-            className={`flex min-h-[260px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed ${file ? "border-primary bg-[#f2faf6]" : "border-border bg-muted/30 hover:border-primary/50"}`}
+            className={`flex min-h-[260px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed ${file ? "border-primary bg-positive/10" : "border-border bg-muted/30 hover:border-primary/50"}`}
           >
             <input
               type="file"
@@ -3502,7 +3618,7 @@ function InvoicePage() {
               className="hidden"
               onChange={chooseFile}
             />
-            <span className="grid size-14 place-items-center rounded-2xl bg-[#e0f0e8] text-primary">
+            <span className="grid size-14 place-items-center rounded-2xl bg-positive/15 text-primary">
               <CloudUpload size={26} />
             </span>
             <div className="mt-4 text-sm font-semibold">
@@ -3788,7 +3904,13 @@ function CopilotPage() {
               </p>
             )}
             {messages.map((m, i) => (
-              <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className={m.role === "user" ? "flex justify-end" : "flex justify-start"}
+              >
                 <div
                   className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${
                     m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
@@ -3796,10 +3918,10 @@ function CopilotPage() {
                 >
                   {m.content}
                 </div>
-              </div>
+              </motion.div>
             ))}
             {loading && <p className="text-xs text-muted-foreground">Thinking…</p>}
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs text-negative">{error}</p>}
             <div ref={bottomRef} />
           </div>
 
@@ -3915,7 +4037,7 @@ function ReportsPage() {
               key={report.title}
               className="flex flex-col p-5 transition hover:-translate-y-1"
             >
-              <span className="grid size-10 place-items-center rounded-xl bg-[#e0f0e8] text-primary">
+              <span className="grid size-10 place-items-center rounded-xl bg-positive/15 text-primary">
                 <Icon size={19} />
               </span>
               <h2 className="mt-5 font-display text-lg font-semibold">
@@ -3968,6 +4090,11 @@ function ReportsPage() {
   );
 }
 
+const WHATSAPP_SANDBOX_NUMBER = "+1 415 523 8886";
+const WHATSAPP_JOIN_CODE = "drop-experiment";
+const WHATSAPP_JOIN_LINK =
+  "https://wa.me/14155238886?text=join%20drop-experiment";
+
 function SettingsPage() {
   const data = useBusinessData();
   const refresh = useRefreshData();
@@ -3979,23 +4106,25 @@ function SettingsPage() {
   );
   const [whatsappBusy, setWhatsappBusy] = useState(false);
 
-  async function saveWhatsappPhone(remove = false) {
+  async function saveWhatsappPhone(phoneOverride?: string) {
+    const phone = phoneOverride ?? whatsappPhone;
     setWhatsappBusy(true);
     try {
       const res = await fetch("/api/business/whatsapp-phone", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ whatsappPhone: remove ? "" : whatsappPhone }),
+        body: JSON.stringify({ whatsappPhone: phone }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         toast.error(body.error ?? "Couldn't save that number");
         return;
       }
+      if (!phone) setWhatsappPhone("");
       toast.success(
-        whatsappPhone
-          && !remove ? "WhatsApp number connected"
+        phone
+          ? "WhatsApp number connected"
           : "WhatsApp number disconnected",
       );
       refresh();
@@ -4035,7 +4164,7 @@ function SettingsPage() {
         <Card className="p-5">
           <SectionTitle eyebrow="Workspace" title={data.business.name} />
           <div className="flex items-center gap-3 border-b border-border pb-5">
-            <span className="grid size-12 place-items-center rounded-2xl bg-[#d5a35e] font-bold text-[#203943]">
+            <span className="grid size-12 place-items-center rounded-2xl bg-warning/20 font-bold text-warning">
               {data.business.name.slice(0, 2).toUpperCase()}
             </span>
             <div>
@@ -4082,7 +4211,35 @@ function SettingsPage() {
             the app.
           </p>
           <div className="space-y-4">
-            <div className="rounded-xl border border-border bg-muted p-4 text-[11px] leading-relaxed text-muted-foreground"><div className="mb-2 text-xs font-semibold text-foreground">How to start (3 easy steps)</div><ol className="list-decimal space-y-1.5 pl-4"><li>Type your WhatsApp number below (with +91) and tap <b>Save number</b>.</li><li>One time only: open WhatsApp and send <b>join drop-experiment</b> to <b>+1 415 523 8886</b>. <a className="font-semibold text-primary underline" href="https://wa.me/14155238886?text=join%20drop-experiment" target="_blank" rel="noreferrer">Tap here to open WhatsApp</a></li><li>Now send a message to the same number, like <b>paid 500 for diesel</b> or <b>sold 2000 to Ramesh</b>. Send <b>undo</b> to remove your last entry.</li></ol></div><Field label="Your WhatsApp number">
+            <div className="rounded-xl border border-border bg-muted/60 p-5">
+              <div className="mb-3 text-sm font-bold">How to start (3 easy steps)</div>
+              <ol className="list-decimal space-y-2.5 pl-5 text-[13px] leading-6 text-muted-foreground">
+                <li>
+                  Type your WhatsApp number below (with +91) and tap{" "}
+                  <b className="text-foreground">Save number</b>.
+                </li>
+                <li>
+                  One time only: open WhatsApp and send{" "}
+                  <b className="text-foreground">join {WHATSAPP_JOIN_CODE}</b> to{" "}
+                  <b className="text-foreground">{WHATSAPP_SANDBOX_NUMBER}</b>.{" "}
+                  <a
+                    href={WHATSAPP_JOIN_LINK}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold text-primary underline"
+                  >
+                    Tap here to open WhatsApp
+                  </a>
+                </li>
+                <li>
+                  Now send a message to the same number, like{" "}
+                  <b className="text-foreground">paid 500 for diesel</b> or{" "}
+                  <b className="text-foreground">sold 2000 to Ramesh</b>. Send{" "}
+                  <b className="text-foreground">undo</b> to remove your last entry.
+                </li>
+              </ol>
+            </div>
+            <Field label="Your WhatsApp number">
               <input
                 className="form-input"
                 placeholder="+919876543210"
@@ -4099,9 +4256,19 @@ function SettingsPage() {
                 {whatsappBusy ? "Saving…" : "Save number"}
               </EmptyButton>
               {data.business.whatsappPhone && (
-                <span className="text-[11px] text-muted-foreground">
-                  Currently connected: {data.business.whatsappPhone}{" "}<button type="button" className="ml-2 font-semibold text-red-600 underline" onClick={() => { setWhatsappPhone(""); saveWhatsappPhone(true); }}>Remove</button>
-                </span>
+                <>
+                  <span className="text-[11px] text-muted-foreground">
+                    Currently connected: {data.business.whatsappPhone}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={whatsappBusy}
+                    onClick={() => saveWhatsappPhone("")}
+                    className="text-xs font-semibold text-negative underline disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -4296,11 +4463,12 @@ function Router() {
 }
 function ClerkApp() {
   const [, setLocation] = useLocation();
+  const { theme } = useThemeMode();
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
       proxyUrl={clerkProxyUrl}
-      appearance={clerkAppearance}
+      appearance={getClerkAppearance(theme)}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
       routerPush={(to) => setLocation(stripBase(to))}
@@ -4312,17 +4480,19 @@ function ClerkApp() {
 }
 function App() {
   return (
-    <LanguageProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <WouterRouter base={basePath}>
-            <ClerkApp />
-          </WouterRouter>
-        <Toaster />
-        <SonnerToaster position="top-right" richColors />
-        </TooltipProvider>
-      </QueryClientProvider>
-    </LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <WouterRouter base={basePath}>
+              <ClerkApp />
+            </WouterRouter>
+            <Toaster />
+            <SonnerToaster position="top-right" richColors />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }
 export default App;

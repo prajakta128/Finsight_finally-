@@ -320,30 +320,64 @@ export function speechSupported(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window;
 }
 
+export type SpeakResult = "ok" | "fallback" | "no-voice" | "unsupported";
+
+const normLocale = (s: string) => s.toLowerCase().replace("_", "-");
+
 /**
- * Speaks the given text using the browser's built-in text-to-speech.
- * Falls back gracefully (returns false, speaks nothing) if the browser
- * doesn't support speech synthesis at all. If no voice matching the exact
- * locale is installed (e.g. no Marathi voice on this device), it falls
- * back to any voice starting with the same base language, and finally to
- * the browser's default voice so something is still read aloud.
+ * Picks the best installed voice for a language.
+ * Marathi falls back to a Hindi voice (same Devanagari script) because many
+ * browsers and devices ship no Marathi voice at all.
  */
-export function speak(text: string, lang: Lang): boolean {
-  if (!speechSupported()) return false;
-
-  window.speechSynthesis.cancel(); // stop anything already playing
-
-  const utterance = new SpeechSynthesisUtterance(text);
-  const targetLocale = VOICE_LOCALE[lang];
+function pickVoice(lang: Lang): { voice: SpeechSynthesisVoice | null; fallback: boolean } {
   const voices = voicesCache.length ? voicesCache : window.speechSynthesis.getVoices();
-  const match =
-    voices.find((v) => v.lang === targetLocale) ??
-    voices.find((v) => v.lang?.toLowerCase().startsWith(lang));
+  const target = normLocale(VOICE_LOCALE[lang]);
+  const exact = voices.find((v) => normLocale(v.lang) === target);
+  if (exact) return { voice: exact, fallback: false };
+  const sameBase = voices.find((v) => normLocale(v.lang).startsWith(lang));
+  if (sameBase) return { voice: sameBase, fallback: false };
+  if (lang === "mr") {
+    const hi =
+      voices.find((v) => normLocale(v.lang) === "hi-in") ??
+      voices.find((v) => normLocale(v.lang).startsWith("hi"));
+    if (hi) return { voice: hi, fallback: true };
+  }
+  return { voice: null, fallback: false };
+}
 
-  if (match) utterance.voice = match;
-  utterance.lang = targetLocale;
-  utterance.rate = 0.72;
+/**
+ * Speaks the text with the browser's built-in text-to-speech.
+ * Long text is split into sentences and spoken one after another, which
+ * avoids Chrome stopping silently in the middle of long speech.
+ * Returns "no-voice" instead of speaking in the wrong language when the
+ * device has no suitable voice, so the UI can tell the user.
+ */
+export function speak(text: string, lang: Lang): SpeakResult {
+  if (!speechSupported()) return "unsupported";
 
-  window.speechSynthesis.speak(utterance);
-  return true;
+  const { voice, fallback } = pickVoice(lang);
+  if (!voice && lang !== "en") return "no-voice";
+
+  const synth = window.speechSynthesis;
+  synth.cancel(); // stop anything already playing
+
+  const chunks = text
+    .split(/(?<=[.।!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const say = () => {
+    for (const chunk of chunks) {
+      const utterance = new SpeechSynthesisUtterance(chunk);
+      if (voice) utterance.voice = voice;
+      utterance.lang = voice ? voice.lang : VOICE_LOCALE[lang];
+      utterance.rate = 0.8;
+      synth.speak(utterance);
+    }
+    synth.resume(); // Chrome sometimes starts paused
+  };
+  // Chrome ignores speak() called right after cancel(); wait a moment.
+  window.setTimeout(say, 80);
+
+  return fallback ? "fallback" : "ok";
 }
