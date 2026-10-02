@@ -1,4 +1,6 @@
 import express, { type Express } from "express";
+import path from "node:path";
+import fs from "node:fs";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -46,5 +48,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// Serve the built frontend (single-service deployment).
+const frontendDist =
+  process.env.FRONTEND_DIST ??
+  path.resolve(process.cwd(), "../finsight/dist/public");
+if (fs.existsSync(path.join(frontendDist, "index.html"))) {
+  app.use(express.static(frontendDist));
+  app.get(/^(?!\/api).*/, (_req, res) => {
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+}
 
 export default app;
