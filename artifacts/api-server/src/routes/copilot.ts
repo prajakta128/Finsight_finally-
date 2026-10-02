@@ -198,7 +198,7 @@ router.post("/copilot", async (req, res, next) => {
       );
 
       res.status(502).json({
-        error: "The copilot is unavailable right now. Please try again.",
+        error: `Gemini ${upstream.status}: ${errorBody.slice(0, 300)}`,
       });
 
       return;
