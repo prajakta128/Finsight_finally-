@@ -3979,14 +3979,14 @@ function SettingsPage() {
   );
   const [whatsappBusy, setWhatsappBusy] = useState(false);
 
-  async function saveWhatsappPhone() {
+  async function saveWhatsappPhone(remove = false) {
     setWhatsappBusy(true);
     try {
       const res = await fetch("/api/business/whatsapp-phone", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ whatsappPhone }),
+        body: JSON.stringify({ whatsappPhone: remove ? "" : whatsappPhone }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -3995,7 +3995,7 @@ function SettingsPage() {
       }
       toast.success(
         whatsappPhone
-          ? "WhatsApp number connected"
+          && !remove ? "WhatsApp number connected"
           : "WhatsApp number disconnected",
       );
       refresh();
@@ -4082,7 +4082,7 @@ function SettingsPage() {
             the app.
           </p>
           <div className="space-y-4">
-            <Field label="Your WhatsApp number">
+            <div className="rounded-xl border border-border bg-muted p-4 text-[11px] leading-relaxed text-muted-foreground"><div className="mb-2 text-xs font-semibold text-foreground">How to start (3 easy steps)</div><ol className="list-decimal space-y-1.5 pl-4"><li>Type your WhatsApp number below (with +91) and tap <b>Save number</b>.</li><li>One time only: open WhatsApp and send <b>join drop-experiment</b> to <b>+1 415 523 8886</b>. <a className="font-semibold text-primary underline" href="https://wa.me/14155238886?text=join%20drop-experiment" target="_blank" rel="noreferrer">Tap here to open WhatsApp</a></li><li>Now send a message to the same number, like <b>paid 500 for diesel</b> or <b>sold 2000 to Ramesh</b>. Send <b>undo</b> to remove your last entry.</li></ol></div><Field label="Your WhatsApp number">
               <input
                 className="form-input"
                 placeholder="+919876543210"
@@ -4100,7 +4100,7 @@ function SettingsPage() {
               </EmptyButton>
               {data.business.whatsappPhone && (
                 <span className="text-[11px] text-muted-foreground">
-                  Currently connected: {data.business.whatsappPhone}
+                  Currently connected: {data.business.whatsappPhone}{" "}<button type="button" className="ml-2 font-semibold text-red-600 underline" onClick={() => { setWhatsappPhone(""); saveWhatsappPhone(true); }}>Remove</button>
                 </span>
               )}
             </div>
