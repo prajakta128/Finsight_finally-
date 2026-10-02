@@ -95,6 +95,7 @@ LANGUAGE:
 
 STYLE:
 - Plain-spoken.
+- Plain text only. No markdown, no headings, no asterisks.
 - Concise.
 - Under 180 words unless more detail is necessary for a financial calculation.
 - Give a concrete next step whenever useful.
@@ -179,7 +180,7 @@ router.post("/copilot", async (req, res, next) => {
           contents,
 
           generationConfig: {
-            maxOutputTokens: 700,
+            maxOutputTokens: 2048,
           },
         }),
       }
