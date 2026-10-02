@@ -4094,7 +4094,7 @@ function SettingsPage() {
               <EmptyButton
                 icon={Check}
                 variant="primary"
-                onClick={saveWhatsappPhone}
+                onClick={() => saveWhatsappPhone()}
               >
                 {whatsappBusy ? "Saving…" : "Save number"}
               </EmptyButton>
