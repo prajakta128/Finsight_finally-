@@ -102,7 +102,7 @@ STYLE:
 
 Business data JSON:
 `;
-async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> { const urls = [url, url.replace("gemini-3.5-flash", "gemini-2.5-flash")]; let last!: Response; for (const u of urls) { for (let a = 0; a < 2; a++) { last = await fetch(u, init); if (last.ok || ![429, 500, 503].includes(last.status)) return last; await new Promise((r) => setTimeout(r, 1000)); } } return last; } router.post("/copilot", async (req, res, next) => {
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> { const urls = [url, url.replace("gemini-3.5-flash", "gemini-2.5-flash")]; let last!: Response; for (const u of urls) { for (let a = 0; a < 3; a++) { last = await fetch(u, init); if (last.ok || ![429, 500, 503].includes(last.status)) return last; await new Promise((r) => setTimeout(r, 2500)); } } return last; } router.post("/copilot", async (req, res, next) => {
   try {
     // Gemini API key
     const apiKey = process.env.GEMINI_API_KEY;
@@ -122,7 +122,7 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
     }
 
     const cleaned = messages
-      .slice(-10)
+      .slice(-50)
       .filter(
         (m: any) =>
           (m?.role === "user" || m?.role === "assistant") &&
@@ -130,7 +130,7 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
       )
       .map((m: any) => ({
         role: m.role,
-        content: m.content.slice(0, 1000),
+        content: m.content.slice(0, 4000),
       }));
 
     if (cleaned.length === 0 || cleaned[0].role !== "user") {
@@ -198,7 +198,7 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
       );
 
       res.status(502).json({
-        error: "The copilot is unavailable right now. Please try again.",
+        error: `The copilot is unavailable right now (Gemini code ${upstream.status}). Please try again.`,
       });
 
       return;
