@@ -55,7 +55,7 @@ import {
   FileCheck2,
   Filter,
   IndianRupee,
-  Info,
+  HelpCircle, Info,
   LayoutDashboard,
   Lightbulb,
   Menu,
@@ -80,6 +80,8 @@ import {
   X,
 } from "lucide-react";
 import { LanguageProvider, useLanguage } from "./lib/LanguageContext";
+import { NotificationBell, WhyButton } from "./components/Why";
+import { WHY_UI, whyAlert, whyChange, whyForecast, whyHealth, whySimulator } from "./lib/why";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { CountUp, PageTransition, Stagger, StaggerItem } from "@/components/motion";
 import { motion } from "framer-motion";
@@ -292,7 +294,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
   {
     title: "Act",
     items: [
-      { href: "/alerts", label: "Alert centre", icon: Bell },
+      { href: "/alerts", label: "Alert centre", icon: Bell }, { href: "/why", label: "Why centre", icon: HelpCircle },
       { href: "/simulator", label: "What-if simulator", icon: Target },
       {
         href: "/invoice-intelligence",
@@ -1130,7 +1132,7 @@ function Shell({ children }: { children: ReactNode }) {
             >
               {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <div className="relative hidden w-[250px] md:block">
+            <NotificationBell f={calculateFinancials(data)} data={data} /><div className="relative hidden w-[250px] md:block">
               <Search
                 size={15}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -1369,7 +1371,7 @@ function Dashboard() {
           <SectionTitle
             eyebrow="At a glance"
             title="Financial health"
-            action={<Info size={15} className="text-muted-foreground" />}
+            action={f.populated ? <WhyButton build={() => whyHealth(f, data)} /> : <Info size={15} className="text-muted-foreground" />}
           />
           {f.populated ? (
             <>
@@ -3177,7 +3179,7 @@ function ForecastPage() {
             <Card className="p-5">
               <SectionTitle
                 eyebrow="Selected horizon"
-                title="Expected closing balance"
+                title="Expected closing balance" action={<WhyButton build={() => whyForecast(f, days)} />}
               />
               <div className="font-display text-4xl font-semibold text-primary">
                 {compact(selected.balance)}
@@ -3271,7 +3273,7 @@ function AlertsPage() {
                       <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                         {a.type}
                       </div>
-                      <h3 className="text-sm font-semibold">{a.title}</h3>
+                      <div className="flex items-start justify-between gap-3"><h3 className="text-sm font-semibold">{a.title}</h3><WhyButton build={() => whyAlert(f.actions.find((x) => x.id === a.id)!, f, data)} /></div>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">
                         {a.text}
                       </p>
@@ -3348,6 +3350,70 @@ function AlertsPage() {
   );
 }
 
+function WhyCentrePage() {
+  const data = useBusinessData();
+  const f = calculateFinancials(data);
+  const { lang } = useLanguage();
+  const ui = WHY_UI[lang];
+  const alerts = f.actions.filter((a) => a.kind !== "baseline");
+  const items: { key: string; title: string; text: string; build: () => ReturnType<typeof whyHealth> }[] = [
+    {
+      key: "health",
+      title: "Financial health score",
+      text: f.populated
+        ? `Your score is ${f.score} out of 100. See what lifts it and what pulls it down.`
+        : "Add a record to get your first score.",
+      build: () => whyHealth(f, data),
+    },
+    ...alerts.map((a) => ({
+      key: a.id,
+      title: a.title,
+      text: a.text,
+      build: () => whyAlert(a, f, data),
+    })),
+    {
+      key: "forecast",
+      title: "Cash forecast (90 days)",
+      text: "See every number that goes into your projected cash.",
+      build: () => whyForecast(f, 90),
+    },
+    {
+      key: "change",
+      title: "Month on month",
+      text: "Understand what moved between last month and this month.",
+      build: () => whyChange(f),
+    },
+  ];
+  return (
+    <>
+      <PageHeader
+        kicker="Understand every number"
+        title={ui.centreTitle}
+        description="Tap Why? on anything to see how FinSight worked it out, in English, Hindi or Marathi. Press Listen to hear it in simple words."
+      />
+      <div className="grid gap-4 lg:grid-cols-2">
+        {items.map((item) => (
+          <Card key={item.key} className="p-5">
+            <div className="flex items-start gap-4">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#e0f0e8] text-primary">
+                <HelpCircle size={19} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-semibold">{item.title}</h3>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.text}</p>
+                <div className="mt-3 flex gap-2">
+                  <WhyButton build={item.build} />
+                  <WhyButton build={item.build} autoListen label={ui.listen} />
+                </div>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function ChangesPage() {
   const data = useBusinessData();
   const f = calculateFinancials(data);
@@ -3384,7 +3450,7 @@ function ChangesPage() {
               ? `${f.monthOverMonth.currentLabel} vs ${f.monthOverMonth.previousLabel}`
               : "The detail behind the delta"
           }
-          title="What changed"
+          title="What changed" action={<WhyButton build={() => whyChange(f)} />}
         />
         {f.populated && f.monthOverMonth?.hasComparison ? (
           <>
@@ -3592,7 +3658,7 @@ function SimulatorPage() {
             <Card className="p-5">
               <SectionTitle
                 eyebrow="Scenario summary"
-                title="The impact in plain English"
+                title="The impact in plain English" action={<WhyButton build={() => whySimulator(f, values)} />}
               />
               <div className="rounded-xl border border-positive/30 bg-positive/10 p-4">
                 <div className="flex items-start gap-3">
@@ -4541,7 +4607,7 @@ function ProtectedWorkspace() {
             <Route path="/vendors" component={VendorsPage} /><Route path="/recurring" component={RecurringPage} />
             <Route path="/analytics" component={AnalyticsPage} />
             <Route path="/forecast" component={ForecastPage} />
-            <Route path="/alerts" component={AlertsPage} />
+            <Route path="/alerts" component={AlertsPage} /><Route path="/why" component={WhyCentrePage} />
             <Route path="/changes" component={ChangesPage} />
             <Route path="/simulator" component={SimulatorPage} />
             <Route path="/invoice-intelligence" component={InvoicePage} />

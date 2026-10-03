@@ -366,18 +366,25 @@ export function calculateFinancials(data?: BusinessBootstrap) {
 
   const forecast = [30, 60, 90].map((days) => {
     const months = days / 30;
-    const inflow =
-      avgMonthlyRevenue * months + dueWithin(receivablesList, days);
-    const outflow =
-      avgMonthlyExpense * months +
-      recurringMonthly * months +
-      dueWithin(payablesList, days);
+    // Each piece is kept separately so the "Why?" popup can show the working.
+    const baseRevenue = avgMonthlyRevenue * months;
+    const receivablesDue = dueWithin(receivablesList, days);
+    const baseExpense = avgMonthlyExpense * months;
+    const recurring = recurringMonthly * months;
+    const payablesDue = dueWithin(payablesList, days);
+    const inflow = baseRevenue + receivablesDue;
+    const outflow = baseExpense + recurring + payablesDue;
     return {
       days,
       label: `${days} days`,
       inflow,
       outflow,
       balance: currentCash + inflow - outflow,
+      baseRevenue,
+      receivablesDue,
+      baseExpense,
+      recurring,
+      payablesDue,
     };
   });
 
