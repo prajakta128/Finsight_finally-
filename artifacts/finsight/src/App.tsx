@@ -133,7 +133,7 @@ import {
   formatDate,
   inr,
 } from "@/lib/financials";
-import { ErrorBoundary } from "@/components/error-boundary";
+import { ErrorBoundary } from "@/components/error-boundary"; import { suggestExpenseCategory } from "./lib/categorize";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -1746,6 +1746,32 @@ function RecordModal({
   }[kind];
   const update = (key: string, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
+    // --- Auto category for expenses ---
+  const savedVendors = useContext(DataContext)?.vendors ?? [];
+  const lastAutoCategory = useRef("Raw materials");
+  const [autoHint, setAutoHint] = useState("");
+  useEffect(() => {
+    if (kind !== "expense") return;
+    // The user picked a category by hand -> leave it alone from now on.
+    if (form.category !== lastAutoCategory.current) {
+      setAutoHint("");
+      return;
+    }
+    if (!form.description.trim() && !form.vendor.trim()) {
+      setAutoHint("");
+      return;
+    }
+    const s = suggestExpenseCategory(form.description, form.vendor, savedVendors);
+    lastAutoCategory.current = s.category;
+    setForm((current) =>
+      current.category === s.category ? current : { ...current, category: s.category },
+    );
+    setAutoHint(
+      s.matched
+        ? `Auto-selected from your ${s.source === "description" ? "description" : s.source === "saved vendor" ? "saved vendor" : "vendor name"}. You can change it.`
+        : "Couldn't tell from the details, so Other overheads is selected. You can change it.",
+    );
+  }, [kind, form.description, form.vendor, form.category]);
   const onSuccess = () => {
     refresh();
     toast.success(`${title} saved`);
@@ -1931,7 +1957,7 @@ function RecordModal({
                     ))}
                   </select>
                 </Field>
-                <Field label="Vendor (optional)">
+                {autoHint && <p className="-mt-2 text-[11px] text-muted-foreground">✨ {autoHint}</p>}<Field label="Vendor (optional)">
                   <input
                     value={form.vendor}
                     onChange={(e) => update("vendor", e.target.value)}
