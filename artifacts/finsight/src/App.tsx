@@ -277,7 +277,7 @@ const navGroups: { title: string; items: NavItem[] }[] = [
       },
       { href: "/revenue", label: "Revenue", icon: TrendingUp },
       { href: "/receivables", label: "Receivables", icon: WalletCards },
-      { href: "/payables", label: "Payables", icon: ArrowDownRight },
+      { href: "/payables", label: "Payables", icon: ArrowDownRight }, { href: "/recurring", label: "Recurring expenses", icon: CalendarDays },
     ],
   },
   {
@@ -2163,7 +2163,7 @@ function RecordModal({
                 >
                   <option>Monthly</option>
                   <option>Weekly</option>
-                  <option>Quarterly</option>
+                  <option>Quarterly</option><option>Yearly</option>
                 </select>
               </Field>
             </div>
@@ -2778,6 +2778,99 @@ function VendorsPage() {
       </Card>
       {showAdd && (
         <RecordModal kind="vendor" onClose={() => setShowAdd(false)} />
+      )}
+    </>
+  );
+}
+
+function RecurringPage() {
+  const data = useBusinessData();
+  const [showAdd, setShowAdd] = useState(false);
+  const f = calculateFinancials(data);
+  const items = data.recurringExpenses;
+  return (
+    <>
+      <PageHeader
+        kicker="Fixed costs"
+        title="Recurring expenses"
+        description="Rent, salaries, subscriptions and other costs that repeat. These feed your cash forecast automatically."
+        action={
+          <EmptyButton
+            icon={Plus}
+            variant="primary"
+            onClick={() => setShowAdd(true)}
+          >
+            Add recurring expense
+          </EmptyButton>
+        }
+      />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Metric
+          label="Recurring items"
+          value={String(items.length)}
+          icon={RefreshCw}
+          tone="blue"
+        />
+        <Metric
+          label="Monthly commitment"
+          value={compact(f.recurringMonthly)}
+          icon={IndianRupee}
+          tone="red"
+        />
+        <Metric
+          label="Yearly commitment"
+          value={compact(f.recurringMonthly * 12)}
+          icon={CalendarDays}
+          tone="amber"
+        />
+      </div>
+      <Card className="mt-6 overflow-hidden">
+        <div className="p-5">
+          <SectionTitle
+            eyebrow="Fixed costs"
+            title="Your recurring expenses"
+          />
+        </div>
+        {items.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-xs">
+              <thead className="bg-muted/50 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-5 py-3">Expense</th>
+                  <th className="px-5 py-3">Category</th>
+                  <th className="px-5 py-3">Frequency</th>
+                  <th className="px-5 py-3">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id} className="border-t border-border">
+                    <td className="px-5 py-4 font-semibold">{item.name}</td>
+                    <td className="px-5 py-4 text-muted-foreground">
+                      {item.category}
+                    </td>
+                    <td className="px-5 py-4">{item.frequency}</td>
+                    <td className="px-5 py-4 font-bold">
+                      {compact(item.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-5">
+            <EmptyState
+              title="No recurring expenses yet"
+              text="Add rent, salaries or subscriptions so your forecast reflects real fixed costs."
+              action="Add recurring expense"
+              onClick={() => setShowAdd(true)}
+            />
+          </div>
+        )}
+      </Card>
+      {showAdd && (
+        <RecordModal kind="recurring" onClose={() => setShowAdd(false)} />
       )}
     </>
   );
@@ -4419,7 +4512,7 @@ function ProtectedWorkspace() {
             <Route path="/revenue" component={RevenuePage} />
             <Route path="/receivables" component={ReceivablesPage} />
             <Route path="/payables" component={PayablesPage} />
-            <Route path="/vendors" component={VendorsPage} />
+            <Route path="/vendors" component={VendorsPage} /><Route path="/recurring" component={RecurringPage} />
             <Route path="/analytics" component={AnalyticsPage} />
             <Route path="/forecast" component={ForecastPage} />
             <Route path="/alerts" component={AlertsPage} />
